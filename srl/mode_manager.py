@@ -1,6 +1,6 @@
 from rclpy.node import Node
 import json
-from splash_interfaces.srv import RegisterMode, RequestModeChange
+from splash_interfaces.srv import RegisterMode, UnregisterMode, RequestModeChange
 from std_msgs.msg import String
 
 class ModeManager(Node):
@@ -10,6 +10,7 @@ class ModeManager(Node):
         self.mode_map = {}
         self.service_mode_change = self.create_service(RequestModeChange, 'request_splash_mode_change', self._request_mode_change_callback)
         self.service_register_mode = self.create_service(RegisterMode, 'register_splash_mode', self._register_mode_callback)
+        self.service_unregister_mode = self.create_service(UnregisterMode, 'unregister_splash_mode', self._unregister_mode_callback)
         self.publisher_map = {}
         
     def _request_mode_change_callback(self, request, response):
@@ -29,7 +30,7 @@ class ModeManager(Node):
         return response
 
     def _register_mode_callback(self, request, response):
-        print("Mode registration")
+        print("Mode registration: ", request.factory)
         try:
             response.ok = True
             self.mode_conf_map[request.factory] = json.loads(request.mode_configuration)
@@ -38,6 +39,18 @@ class ModeManager(Node):
             if not request.factory in self.publisher_map.keys():
                 self.publisher_map[request.factory] = []
             self.publisher_map[request.factory].append(self.create_publisher(String, topic, 1))
+        except:
+            response.ok = False
+        
+        return response 
+    
+    def _unregister_mode_callback(self, request, response):
+        print("Mode unregistration: ", request.factory)
+        try:
+            del(self.mode_conf_map[request.factory])
+            del(self.mode_map[request.factory])
+            del(self.publisher_map[request.factory])
+            response.ok = True
         except:
             response.ok = False
         
