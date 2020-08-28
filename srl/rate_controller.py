@@ -16,7 +16,6 @@ class RateController():
         if len(self._queue) > 0:
             msg = self._queue.pop(0)
             time_diff_ms = (self._stream_output_port.parent.get_clock().now().nanoseconds - Time.from_msg(msg.header.stamp).nanoseconds) / 1000000
-            print(time_diff_ms)
             if msg.freshness < time_diff_ms:
                 self._task()
                 return
