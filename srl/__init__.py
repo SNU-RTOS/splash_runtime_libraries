@@ -2,7 +2,6 @@ import rclpy
 from rclpy.executors import SingleThreadedExecutor
 from .mode_manager import ModeManager
 from .rate_controller import RateController
-from .timing_behavior_monitor import TimingBehaviorMonitor
 
 def run():
     context = rclpy.init()
