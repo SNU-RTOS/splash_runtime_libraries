@@ -7,6 +7,7 @@ class RateController():
         self._publisher = self._stream_output_port.get_publisher()
         self._last_sent_item = None
         self._initialized = False
+        self.exception = Exception
 
     def _create_timer(self):
         component = self._stream_output_port.parent
@@ -16,9 +17,10 @@ class RateController():
         if len(self._queue) > 0:
             msg = self._queue.pop(0)
             time_diff_ms = (self._stream_output_port.parent.get_clock().now().nanoseconds - Time.from_msg(msg.header.stamp).nanoseconds) / 1000000
-            if msg.freshness < time_diff_ms:
+            if msg.freshness > 0 and msg.freshness < time_diff_ms:
+                raise self.exception('{}ms exceeded(constraint: {}ms, cur: {}ms'.format(time_diff_ms - msg.freshness, msg.freshness, time_diff_ms))
                 self._task()
-                return
+                return 
         elif self._last_sent_item:
             msg = self._last_sent_item
         else:

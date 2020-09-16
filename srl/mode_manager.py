@@ -2,7 +2,7 @@ from rclpy.node import Node
 import json
 from splash_interfaces.srv import RegisterMode, UnregisterMode, RequestModeChange
 from std_msgs.msg import String
-
+from std_srvs.srv import Empty
 class ModeManager(Node):
     def __init__(self, context):
         super().__init__("splash_mode_manager", context=context)
@@ -11,6 +11,7 @@ class ModeManager(Node):
         self.service_mode_change = self.create_service(RequestModeChange, 'request_splash_mode_change', self._request_mode_change_callback)
         self.service_register_mode = self.create_service(RegisterMode, 'register_splash_mode', self._register_mode_callback)
         self.service_unregister_mode = self.create_service(UnregisterMode, 'unregister_splash_mode', self._unregister_mode_callback)
+        self.service_check_alive = self.create_service(Empty, 'check_alive_mode_manager', self._check_alive_mode_manager_callback)
         self.publisher_map = {}
         
     def _request_mode_change_callback(self, request, response):
@@ -26,7 +27,8 @@ class ModeManager(Node):
                 msg.data = next_mode
                 for publisher in self.publisher_map[request.factory]:
                     publisher.publish(msg)
-
+            else:
+                response.ok = False
         return response
 
     def _register_mode_callback(self, request, response):
@@ -54,4 +56,7 @@ class ModeManager(Node):
         except:
             response.ok = False
         
+        return response
+    
+    def _check_alive_mode_manager_callback(self, request, response):
         return response

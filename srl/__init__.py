@@ -3,7 +3,7 @@ from rclpy.executors import SingleThreadedExecutor
 from .mode_manager import ModeManager
 from .rate_controller import RateController
 
-def run():
+def init():
     context = rclpy.init()
     __executor = SingleThreadedExecutor()
     __modeManager = ModeManager(context=context)
