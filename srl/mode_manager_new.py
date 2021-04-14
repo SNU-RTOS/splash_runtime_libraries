@@ -8,29 +8,30 @@ class ModeManager(Node):
         super().__init__("splash_mode_manager", context=context)
         self.mode_conf_map = {}
         self.mode_map = {}
-        self.service_mode_change = self.create_service(RequestModeChange, 'request_splash_mode_change', self._request_mode_change_callback)
         self.service_register_mode = self.create_service(RegisterMode, 'register_splash_mode', self._register_mode_callback)
         self.service_unregister_mode = self.create_service(UnregisterMode, 'unregister_splash_mode', self._unregister_mode_callback)
         self.service_check_alive = self.create_service(Empty, 'check_alive_mode_manager', self._check_alive_mode_manager_callback)
         self.publisher_map = {}
+        self.sub_mode_change = self.create_subscription(String, "splash_mode_change", self._mode_change_callback, 1)
         
-    def _request_mode_change_callback(self, request, response):
-        response.ok = False
-        cur_mode = next((item for item in self.mode_conf_map[request.factory]["mode_list"] if item["name"] == self.mode_map[request.factory]), None)
+    def _mode_change_callback(self, msg):
+        factory = ""
+        event = ""
+        cur_mode = next((item for item in self.mode_conf_map[factory]["mode_list"] if item["name"] == self.mode_map[factory]), None)
         if cur_mode:
-            cur_event = next((item for item in cur_mode["events"] if item["name"] == request.event), None)
+            cur_event = next((item for item in cur_mode["events"] if item["name"] == event), None)
             if cur_event:
                 next_mode = cur_event["next_mode"]
-                response.ok = True
-                self.mode_map[request.factory] = next_mode
+                self.mode_map[factory] = next_mode
                 msg = String()
                 msg.data = next_mode
-                for publisher in self.publisher_map[request.factory]:
+                for publisher in self.publisher_map[factory]:
                     publisher.publish(msg)
             else:
-                response.ok = False
-        return response
-
+                self.get_logger().error("invalid event name")
+        else:
+            self.get_logger().error("invalid factory name")
+    
     def _register_mode_callback(self, request, response):
         print("Mode registration: ", request.factory)
         try:

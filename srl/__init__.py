@@ -1,6 +1,6 @@
 import rclpy
 from rclpy.executors import SingleThreadedExecutor
-from .mode_manager import ModeManager
+from .mode_manager_new import ModeManager
 from .rate_controller import RateController
 
 def init():
