@@ -4,6 +4,9 @@ from std_msgs.msg import Header
 
 import pickle
 from array import *
+import time
+
+import traceback
 
 class FusionRule:
     def __init__(self, mandatory_ports, optional_ports, optional_ports_threshold, correlation_constraint):
@@ -17,25 +20,35 @@ class SensorFusion:
         self.fusion_operator = fusion_operator
 
     def fusion_callback(self, channel, msg):
-        self.fusion_operator.queues_for_input_ports[channel].append(msg)
-        valid_input_data = self._find_valid_input_data()
-        oldest_birthmark = None
-        if valid_input_data:
-            for c, data in valid_input_data.items():
-                if oldest_birthmark == None or Time.from_msg(data.header.stamp) < Time.from_msg(oldest_birthmark):
-                    oldest_birthmark = data.header.stamp
-                    freshness_constraint = data.freshness_constraint
-                valid_input_data[c] = pickle.loads(data.body)
-            splash_message = SplashMessage()
-            header = Header()
-            header.stamp = oldest_birthmark
-            splash_message.header = header
-            splash_message.body = array('B', pickle.dumps(valid_input_data))
-            splash_message.freshness_constraint = freshness_constraint
-            self.fusion_operator.stream_output_ports[self.fusion_operator.output_channel].write(splash_message)
-        else:
-            pass
+        try:
+            start = time.time() 
+            self.fusion_operator.queues_for_input_ports[channel].append(msg)
+            valid_input_data = self._find_valid_input_data()
+            oldest_birthmark = None
+            if valid_input_data:
+                for c, data in valid_input_data.items():
+                    if data == None:
+                        continue
+                    if oldest_birthmark == None or Time.from_msg(data.header.stamp) < Time.from_msg(oldest_birthmark):
+                        oldest_birthmark = data.header.stamp
+                        freshness_constraint = data.freshness_constraint
+                    valid_input_data[c] = pickle.loads(data.body)
+                splash_message = SplashMessage()
+                header = Header()
+                header.stamp = oldest_birthmark
+                splash_message.header = header
+                splash_message.body = array('B', pickle.dumps(valid_input_data))
+                splash_message.freshness_constraint = freshness_constraint
+                self.fusion_operator.stream_output_ports[self.fusion_operator.output_channel].write(splash_message)
+            else:
+                pass
+            print(f"time: {(time.time() - start) * 1000:.2f}ms")
+        except Exception as e:
+            print(traceback.format_exc())
+            print(e)
+
     def _find_valid_input_data(self):
+
         index_list = [None] * len(self.fusion_operator.queues_for_input_ports.keys())
         i = 0
         optional_ports_count = 0
@@ -64,19 +77,20 @@ class SensorFusion:
             if is_last:
                 index_list[k] = None
             else:
-                index_list[k] = index_list[k] + 1
+                index_list[k] += 1
             flag = False
             for index in index_list:
-                if index is not None:
+                if index != None:
                     flag = True
                     break
         return None
+
 
     def _is_valid_data(self, index_list):
         i = 0
         cur_data_list = []
         for queue in self.fusion_operator.queues_for_input_ports.values():
-            if index_list[i] is not None:
+            if index_list[i] != None:
                 cur_data_list.append(queue[index_list[i]])
             i = i + 1
         if len(cur_data_list) < 2:
@@ -95,7 +109,7 @@ class SensorFusion:
         data = {}
         for key, queue in self.fusion_operator.queues_for_input_ports.items():
             data[key] = None
-            if index_list[i] is not None:
+            if index_list[i] != None:
                 data[key] = queue[index_list[i]]
                 if len(queue) == index_list[i] + 1:
                     queue = []
@@ -105,6 +119,7 @@ class SensorFusion:
             i = i + 1
 
         return data
+
     
     def _get_earlist_index(self, index_list):
         is_last = False
@@ -116,11 +131,22 @@ class SensorFusion:
             index = index + 1
         index = 0
         for queue in queue_list:
-            if index_list[index] is not None:
-                if earlist_index < 0 or (len(queue) > 0 and Time.from_msg(queue[index_list[index]].header.stamp) < Time.from_msg(queue_list[earlist_index][index_list[earlist_index]].header.stamp)):
+            if index_list[index] != None:
+                if earlist_index < 0:
                     earlist_index = index
-                index = index + 1
-            if len(queue_list[earlist_index]) == index_list[earlist_index] + 1:
-                is_last = True
+                elif len(queue) > 0:
+                    new = queue[index_list[index]]
+                    new_stamp = new.header.stamp
+                    new_stamp = Time.from_msg(new_stamp)
+                    cur_queue = queue_list[earlist_index]
+                    cur = cur_queue[index_list[earlist_index]]
+                    cur_stamp = cur.header.stamp
+                    cur_stamp = Time.from_msg(cur_stamp)
+                    if(new_stamp < cur_stamp):
+                        earlist_index = index
 
-            return earlist_index, is_last
+            index = index + 1
+            
+        if len(queue_list[earlist_index]) == index_list[earlist_index] + 1:
+            is_last = True
+        return earlist_index, is_last
